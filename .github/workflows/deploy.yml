@@ -1,0 +1,53 @@
+name: Deploy Strapi to Droplet
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    # This line connects the job to your "production" environment
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Strapi
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Copy files to Droplet
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          # We send the build files and the source code
+          source: "package.json,package-lock.json,config,public,src,database,build,dist"
+          target: "/var/www/pickleball/backend"
+          overwrite: true
+
+      - name: Production Restart
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /var/www/pickleball/backend
+            # Install only production dependencies to save space/time
+            npm install --omit=dev
+            # Restart PM2 to pick up the new build
+            pm2 restart pickleball-api --update-env
