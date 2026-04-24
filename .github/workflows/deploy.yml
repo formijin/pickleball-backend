@@ -31,8 +31,8 @@ jobs:
       - name: Copy files to Droplet
         uses: appleboy/scp-action@master
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           # We send the build files and the source code
           source: "package.json,package-lock.json,config,public,src,database,build,dist"
@@ -42,8 +42,8 @@ jobs:
       - name: Production Restart
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd /var/www/pickleball/backend
