@@ -35,7 +35,7 @@ jobs:
           username: ${{ vars.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           # We send the build files and the source code
-          source: "package.json,package-lock.json,config,public,src,database,build,dist"
+          source: "package.json,package-lock.json,config,public,src,database,build,dist,!public/uploads"
           target: "/var/www/pickleball/backend"
           overwrite: true
 
