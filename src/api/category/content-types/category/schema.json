@@ -1,0 +1,25 @@
+{
+  "kind": "collectionType",
+  "collectionName": "categories",
+  "info": {
+    "singularName": "category",
+    "pluralName": "categories",
+    "displayName": "Category (Press Releases)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "press_releases": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::press-release.press-release",
+      "inversedBy": "category"
+    }
+  }
+}
