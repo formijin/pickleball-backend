@@ -17,8 +17,7 @@
       "unique": true
     },
     "body": {
-      "type": "blocks",
-      "required": true
+      "type": "richtext"
     },
     "cover": {
       "type": "media",
@@ -41,9 +40,6 @@
       "relation": "manyToMany",
       "target": "api::category.category",
       "mappedBy": "press_releases"
-    },
-    "body2": {
-      "type": "richtext"
     },
     "excerpts": {
       "type": "component",

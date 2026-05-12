@@ -518,8 +518,7 @@ export interface ApiPressReleasePressRelease
       'manyToMany',
       'plugin::users-permissions.user'
     >;
-    body: Schema.Attribute.Blocks & Schema.Attribute.Required;
-    body2: Schema.Attribute.RichText;
+    body: Schema.Attribute.RichText & Schema.Attribute.Required;
     category: Schema.Attribute.Relation<'manyToMany', 'api::category.category'>;
     cover: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     createdAt: Schema.Attribute.DateTime;
