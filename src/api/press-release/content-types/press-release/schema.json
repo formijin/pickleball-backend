@@ -16,24 +16,10 @@
       "required": true,
       "unique": true
     },
-    "body": {
-      "type": "richtext"
-    },
-    "cover": {
-      "type": "media",
-      "multiple": false,
-      "allowedTypes": [
-        "images",
-        "files",
-        "videos",
-        "audios"
-      ]
-    },
-    "authors": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "plugin::users-permissions.user",
-      "inversedBy": "press_releases"
+    "slug": {
+      "type": "uid",
+      "targetField": "title",
+      "required": true
     },
     "category": {
       "type": "relation",
@@ -41,10 +27,32 @@
       "target": "api::category.category",
       "mappedBy": "press_releases"
     },
+    "authors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "press_releases"
+    },
     "excerpts": {
       "type": "component",
       "component": "something.excerpts",
-      "repeatable": false
+      "repeatable": false,
+      "required": true
+    },
+    "cover": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "body": {
+      "type": "richtext",
+      "required": true
     }
   }
 }

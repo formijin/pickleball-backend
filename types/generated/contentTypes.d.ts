@@ -518,7 +518,7 @@ export interface ApiPressReleasePressRelease
       'manyToMany',
       'plugin::users-permissions.user'
     >;
-    body: Schema.Attribute.RichText & Schema.Attribute.Required;
+    body: Schema.Attribute.RichText;
     category: Schema.Attribute.Relation<'manyToMany', 'api::category.category'>;
     cover: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     createdAt: Schema.Attribute.DateTime;
@@ -997,7 +997,6 @@ export interface PluginUsersPermissionsUser
   };
   options: {
     draftAndPublish: false;
-    timestamps: true;
   };
   attributes: {
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
