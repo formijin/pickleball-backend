@@ -35,12 +35,10 @@ jobs:
         run: |
           mkdir ../deploy-package
           
-          # Copy target folders conditionally
+          # ONLY copy the compiled dist folder and public assets
           [ -d build ] && cp -r build ../deploy-package/ || echo "No build folder"
           [ -d dist ] && cp -r dist ../deploy-package/ || echo "No dist folder"
-          [ -d config ] && cp -r config ../deploy-package/ || echo "No config folder"
           [ -d public ] && cp -r public ../deploy-package/ || echo "No public folder"
-          [ -d src ] && cp -r src ../deploy-package/ || echo "No src folder"
           
           # Safely protect live upload storage paths
           rm -rf ../deploy-package/public/uploads
@@ -77,6 +75,9 @@ jobs:
           port: 22
           script: |
             cd /var/www/pickleball/backend
+            
+            # Clean up old raw TS folders just in case they are lingering
+            rm -rf config src
             
             # 1. Access the runner token dynamically inside the execution context
             GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
