@@ -4,14 +4,17 @@ on:
   push:
     branches: [ main ]
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    # This line connects the job to your "production" environment
-    environment: production
+permissions:
+  contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -23,31 +26,68 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Strapi
+      - name: Build Strapi production assets
         run: npm run build
         env:
           NODE_ENV: production
 
-      - name: Copy files to Droplet
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ vars.SSH_HOST }}
-          username: ${{ vars.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          # We send the build files and the source code
-          source: "package.json,package-lock.json,config,public,src,database,build,dist,!public/uploads"
-          target: "/var/www/pickleball/backend"
-          overwrite: true
+      - name: Package Production Artifacts
+        run: |
+          mkdir ../deploy-package
+          
+          # Copy only the compiled engine folders needed for execution
+          cp -r build ../deploy-package/
+          cp -r dist ../deploy-package/
+          cp -r config ../deploy-package/
+          cp -r public ../deploy-package/
+          
+          # Safely ensure no local media placeholders overwrite the live server uploads
+          rm -rf ../deploy-package/public/uploads
+          
+          cp package.json ../deploy-package/
+          cp package-lock.json ../deploy-package/
+          
+          cd ../deploy-package
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git checkout -b deploy
+          git add -A
+          git commit -m "build: backend production artifacts (commit ${{ github.sha }})"
+          git push -f origin deploy
 
-      - name: Production Restart
-        uses: appleboy/ssh-action@master
+  remote-deploy:
+    needs: build-and-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute Server Remote Deployment
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ vars.SSH_HOST }}
           username: ${{ vars.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          port: 22
           script: |
             cd /var/www/pickleball/backend
-            # Install only production dependencies to save space/time
+            
+            # 1. Access the runner token dynamically inside the terminal runner execution context
+            GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            
+            # 2. Inject the dynamic short-lived authorization token directly into your remote URL
+            git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+            
+            # 3. Pull code directly from your secure deploy branch
+            git fetch origin deploy
+            git checkout deploy
+            git reset --hard origin/deploy
+            
+            # 4. Strip the security token out immediately to keep your git config file clean
+            git remote set-url origin "https://github.com/${{ github.repository }}.git"
+            
+            # 5. Handle node production updates
             npm install --omit=dev
-            # Restart PM2 to pick up the new build
-            pm2 restart pickleball-api --update-env
+            
+            # 6. Failure-proof reload: restart the api, or start it cold if it dropped from memory
+            pm2 restart pickleball-api --update-env || pm2 start npm --name "pickleball-api" -- run start
