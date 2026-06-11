@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir ../deploy-package
           
-          # Copy target folders conditionally. If they exist, migrate them.
+          # Copy target folders conditionally
           [ -d build ] && cp -r build ../deploy-package/ || echo "No explicit build folder found, skipping."
           [ -d dist ] && cp -r dist ../deploy-package/ || echo "No explicit dist folder found, skipping."
           [ -d config ] && cp -r config ../deploy-package/ || echo "No explicit config folder found, skipping."
@@ -63,6 +63,8 @@ jobs:
   remote-deploy:
     needs: build-and-package
     runs-on: ubuntu-latest
+    # CRITICAL: This connects the execution step to your 'production' variables block!
+    environment: production
     steps:
       - name: Execute Server Remote Deployment
         uses: appleboy/ssh-action@v1.0.3
