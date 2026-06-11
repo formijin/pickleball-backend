@@ -35,15 +35,17 @@ jobs:
         run: |
           mkdir ../deploy-package
           
-          # Copy only the compiled engine folders needed for execution
-          cp -r build ../deploy-package/
-          cp -r dist ../deploy-package/
-          cp -r config ../deploy-package/
-          cp -r public ../deploy-package/
+          # Copy target folders conditionally. If they exist, migrate them.
+          [ -d build ] && cp -r build ../deploy-package/ || echo "No explicit build folder found, skipping."
+          [ -d dist ] && cp -r dist ../deploy-package/ || echo "No explicit dist folder found, skipping."
+          [ -d config ] && cp -r config ../deploy-package/ || echo "No explicit config folder found, skipping."
+          [ -d public ] && cp -r public ../deploy-package/ || echo "No explicit public folder found, skipping."
+          [ -d src ] && cp -r src ../deploy-package/ || echo "No explicit src folder found, skipping."
           
-          # Safely ensure no local media placeholders overwrite the live server uploads
+          # Safely protect live upload storage paths
           rm -rf ../deploy-package/public/uploads
           
+          # Copy crucial node application anchors
           cp package.json ../deploy-package/
           cp package-lock.json ../deploy-package/
           
@@ -72,7 +74,7 @@ jobs:
           script: |
             cd /var/www/pickleball/backend
             
-            # 1. Access the runner token dynamically inside the terminal runner execution context
+            # 1. Access the runner token dynamically inside the execution context
             GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
             
             # 2. Inject the dynamic short-lived authorization token directly into your remote URL
