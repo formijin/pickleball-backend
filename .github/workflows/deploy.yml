@@ -36,11 +36,11 @@ jobs:
           mkdir ../deploy-package
           
           # Copy target folders conditionally
-          [ -d build ] && cp -r build ../deploy-package/ || echo "No explicit build folder found, skipping."
-          [ -d dist ] && cp -r dist ../deploy-package/ || echo "No explicit dist folder found, skipping."
-          [ -d config ] && cp -r config ../deploy-package/ || echo "No explicit config folder found, skipping."
-          [ -d public ] && cp -r public ../deploy-package/ || echo "No explicit public folder found, skipping."
-          [ -d src ] && cp -r src ../deploy-package/ || echo "No explicit src folder found, skipping."
+          [ -d build ] && cp -r build ../deploy-package/ || echo "No build folder"
+          [ -d dist ] && cp -r dist ../deploy-package/ || echo "No dist folder"
+          [ -d config ] && cp -r config ../deploy-package/ || echo "No config folder"
+          [ -d public ] && cp -r public ../deploy-package/ || echo "No public folder"
+          [ -d src ] && cp -r src ../deploy-package/ || echo "No src folder"
           
           # Safely protect live upload storage paths
           rm -rf ../deploy-package/public/uploads
@@ -56,14 +56,16 @@ jobs:
           
           git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git checkout -b deploy
-          git add -A
+          
+          # CRITICAL FIX: Force add all assets, bypassing any .gitignore rules
+          git add -A --force
+          
           git commit -m "build: backend production artifacts (commit ${{ github.sha }})"
           git push -f origin deploy
 
   remote-deploy:
     needs: build-and-package
     runs-on: ubuntu-latest
-    # CRITICAL: This connects the execution step to your 'production' variables block!
     environment: production
     steps:
       - name: Execute Server Remote Deployment
@@ -93,5 +95,5 @@ jobs:
             # 5. Handle node production updates
             npm install --omit=dev
             
-            # 6. Failure-proof reload: restart the api, or start it cold if it dropped from memory
+            # 6. Boot from the true entry point script using npm package start script flags
             pm2 restart pickleball-api --update-env || pm2 start npm --name "pickleball-api" -- run start
