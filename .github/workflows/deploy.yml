@@ -4,74 +4,50 @@ on:
   push:
     branches: [ main ]
 
-permissions:
-  contents: read
-
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    # This line connects the job to your "production" environment
     environment: production
+
     steps:
-      - name: Execute Server Remote Deployment
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Strapi
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Copy files to Droplet
+        uses: appleboy/scp-action@master
         with:
           host: ${{ vars.SSH_HOST }}
           username: ${{ vars.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          port: 22
+          # We send the build files and the source code
+          source: "package.json,package-lock.json,config,public,src,database,build,dist,!public/uploads"
+          target: "/var/www/pickleball/backend"
+          overwrite: true
+
+      - name: Production Restart
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
           script: |
-            set -euo pipefail
-
             cd /var/www/pickleball/backend
-
-            # Ensure uploads live outside the repo so git reset never touches them
-            if [ ! -L public/uploads ]; then
-              mkdir -p /var/www/pickleball/uploads
-              rm -rf public/uploads
-              ln -s /var/www/pickleball/uploads public/uploads
-            fi
-
-            # Snapshot current dist and config for rollback
-            ROLLBACK=$(mktemp -d)
-            cp -r dist "$ROLLBACK/" 2>/dev/null || true
-            cp -r config "$ROLLBACK/" 2>/dev/null || true
-
-            # Pull latest source from main
-            git fetch origin main
-            git checkout main
-            git reset --hard origin/main
-
-            # Install dependencies
-            npm install --omit=dev --prefer-offline
-
-            # Ensure compiled config is in both locations Strapi checks
-            mkdir -p config
-            cp -r dist/config/. config/
-
-            # Stop Strapi to free RAM before building admin panel
-            pm2 stop pickleball-api || true
-
-            # Build admin panel on server
-            NODE_ENV=production NODE_OPTIONS="--max-old-space-size=1024" node_modules/.bin/strapi build
-
-            # Start Strapi back up
-            pm2 reload pickleball-api --update-env || pm2 start /var/www/pickleball/ecosystem.config.js
-
-            echo "Waiting for app to become healthy..."
-            for i in $(seq 1 12); do
-              sleep 5
-              if curl -sf http://localhost:1337/_health > /dev/null 2>&1; then
-                echo "Health check passed on attempt $i."
-                rm -rf "$ROLLBACK"
-                exit 0
-              fi
-              echo "Attempt $i/12: server not responding yet..."
-            done
-
-            echo "ERROR: Health check failed after 60s. Rolling back..."
-            cp -r "$ROLLBACK/dist" . 2>/dev/null || true
-            cp -r "$ROLLBACK/config" . 2>/dev/null || true
-            rm -rf "$ROLLBACK"
-            npm install --omit=dev --prefer-offline
-            pm2 reload pickleball-api --update-env
-            exit 1
+            # Install only production dependencies to save space/time
+            npm install --omit=dev
+            # Restart PM2 to pick up the new build
+            pm2 restart pickleball-api --update-env
