@@ -38,6 +38,16 @@ jobs:
           # Deploy compiled config to both locations Strapi checks
           cp -r dist/config ../deploy-package/config
 
+          # Package the admin panel build from where strapi build wrote it
+          ADMIN_BUILD="node_modules/@strapi/admin/dist/server/server/build"
+          if [ -d "$ADMIN_BUILD" ]; then
+            mkdir -p ../deploy-package/strapi-admin-build
+            cp -r "$ADMIN_BUILD"/. ../deploy-package/strapi-admin-build/
+            echo "Admin panel build packaged."
+          else
+            echo "WARNING: Admin build not found at $ADMIN_BUILD"
+          fi
+
           # Protect live upload storage
           rm -rf ../deploy-package/public/uploads
 
@@ -51,7 +61,7 @@ jobs:
           git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git checkout -b deploy
 
-          git add dist/ config/ public/ package.json package-lock.json 2>/dev/null || true
+          git add dist/ config/ public/ strapi-admin-build/ package.json package-lock.json 2>/dev/null || true
           git add $(git ls-files --others --exclude-standard | grep -v '\.env') 2>/dev/null || true
 
           git commit -m "build: backend production artifacts (commit ${{ github.sha }})"
@@ -96,18 +106,19 @@ jobs:
             # Strip token immediately after use
             git remote set-url origin "https://github.com/${{ github.repository }}.git"
 
-            npm install --omit=dev
+            # Only reinstall if dependencies changed — uses cache for speed
+            npm install --omit=dev --prefer-offline
 
-            # Link admin panel build to where Strapi's server expects it.
-            # npm install may recreate node_modules so we re-link on every deploy.
-            ADMIN_BUILD_SRC="/var/www/pickleball/backend/dist/build"
-            ADMIN_BUILD_DEST="/var/www/pickleball/backend/node_modules/@strapi/admin/dist/server/server/build"
-            if [ -d "$ADMIN_BUILD_SRC" ]; then
+            # Restore admin panel build into node_modules where Strapi expects it.
+            # Must happen after npm install since install would otherwise wipe it.
+            ADMIN_BUILD_DEST="node_modules/@strapi/admin/dist/server/server/build"
+            if [ -d strapi-admin-build ]; then
               rm -rf "$ADMIN_BUILD_DEST"
-              ln -s "$ADMIN_BUILD_SRC" "$ADMIN_BUILD_DEST"
-              echo "Admin panel build linked."
+              mkdir -p "$ADMIN_BUILD_DEST"
+              cp -r strapi-admin-build/. "$ADMIN_BUILD_DEST/"
+              echo "Admin panel build restored."
             else
-              echo "WARNING: Admin build source missing at $ADMIN_BUILD_SRC"
+              echo "WARNING: strapi-admin-build not found — admin panel may not load."
             fi
 
             pm2 reload pickleball-api --update-env || pm2 start /var/www/pickleball/ecosystem.config.js
@@ -127,6 +138,6 @@ jobs:
             cp -r "$ROLLBACK_DIST/dist" . 2>/dev/null || true
             cp -r "$ROLLBACK_DIST/config" . 2>/dev/null || true
             rm -rf "$ROLLBACK_DIST"
-            npm install --omit=dev
+            npm install --omit=dev --prefer-offline
             pm2 reload pickleball-api --update-env
             exit 1
