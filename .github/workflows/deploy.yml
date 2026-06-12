@@ -36,6 +36,10 @@ jobs:
           [ -d dist ] && cp -r dist ../deploy-package/ || echo "No dist folder"
           [ -d public ] && cp -r public ../deploy-package/ || echo "No public folder"
 
+          # Deploy compiled config to BOTH locations Strapi checks:
+          # dist/config/ (distDir) and config/ (appDir) — Strapi reads appDir first
+          cp -r dist/config ../deploy-package/config
+
           # Protect live upload storage — never package uploads
           rm -rf ../deploy-package/public/uploads
 
@@ -46,12 +50,10 @@ jobs:
           git init
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
           git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git checkout -b deploy
 
-          # Add only known safe paths — never bypass .gitignore globally
-          git add build/ dist/ public/ package.json package-lock.json 2>/dev/null || true
+          git add build/ dist/ config/ public/ package.json package-lock.json 2>/dev/null || true
           git add $(git ls-files --others --exclude-standard | grep -v '\.env') 2>/dev/null || true
 
           git commit -m "build: backend production artifacts (commit ${{ github.sha }})"
@@ -70,13 +72,11 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # Abort on any error — do not proceed with a broken state
             set -euo pipefail
 
             cd /var/www/pickleball/backend
 
-            # Ensure uploads live outside the repo so git reset never touches them.
-            # This is idempotent — safe to re-run on every deploy.
+            # Ensure uploads live outside the repo so git reset never touches them
             if [ ! -L public/uploads ]; then
               mkdir -p /var/www/pickleball/uploads
               rm -rf public/uploads
@@ -90,18 +90,15 @@ jobs:
             git checkout deploy
             git reset --hard origin/deploy
 
-            # Strip token immediately after use
             git remote set-url origin "https://github.com/${{ github.repository }}.git"
-
-            # Old TS source folders are gone after reset — no need to delete them first
-            # (previously this ran unconditionally before the pull, risking data loss)
 
             npm install --omit=dev
 
-            # Rolling restart — keeps existing workers alive until new ones are ready
-            pm2 reload pickleball-api --update-env || pm2 start npm --name "pickleball-api" -- run start
+            # Rebuild admin panel assets from the freshly installed node_modules
+            NODE_ENV=production node_modules/.bin/strapi build
 
-            # Health check — roll back if the app didn't come up within 30s
+            pm2 reload pickleball-api --update-env || pm2 start ecosystem.config.js
+
             echo "Waiting for app to become healthy..."
             for i in $(seq 1 6); do
               sleep 5
@@ -115,5 +112,6 @@ jobs:
             echo "ERROR: Health check failed after 30s. Rolling back..."
             git reset --hard HEAD~1
             npm install --omit=dev
+            NODE_ENV=production node_modules/.bin/strapi build
             pm2 reload pickleball-api --update-env
             exit 1
