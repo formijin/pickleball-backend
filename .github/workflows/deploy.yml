@@ -7,9 +7,6 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build-and-package:
     runs-on: ubuntu-latest
@@ -34,30 +31,29 @@ jobs:
       - name: Package Production Artifacts
         run: |
           mkdir ../deploy-package
-          
-          # ONLY copy the compiled dist folder and public assets
+
           [ -d build ] && cp -r build ../deploy-package/ || echo "No build folder"
           [ -d dist ] && cp -r dist ../deploy-package/ || echo "No dist folder"
           [ -d public ] && cp -r public ../deploy-package/ || echo "No public folder"
-          
-          # Safely protect live upload storage paths
+
+          # Protect live upload storage — never package uploads
           rm -rf ../deploy-package/public/uploads
-          
-          # Copy crucial node application anchors
+
           cp package.json ../deploy-package/
           cp package-lock.json ../deploy-package/
-          
+
           cd ../deploy-package
           git init
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git checkout -b deploy
-          
-          # CRITICAL FIX: Force add all assets, bypassing any .gitignore rules
-          git add -A --force
-          
+
+          # Add only known safe paths — never bypass .gitignore globally
+          git add build/ dist/ public/ package.json package-lock.json 2>/dev/null || true
+          git add $(git ls-files --others --exclude-standard | grep -v '\.env') 2>/dev/null || true
+
           git commit -m "build: backend production artifacts (commit ${{ github.sha }})"
           git push -f origin deploy
 
@@ -74,27 +70,50 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
+            # Abort on any error — do not proceed with a broken state
+            set -euo pipefail
+
             cd /var/www/pickleball/backend
-            
-            # Clean up old raw TS folders just in case they are lingering
-            rm -rf config src
-            
-            # 1. Access the runner token dynamically inside the execution context
+
+            # Ensure uploads live outside the repo so git reset never touches them.
+            # This is idempotent — safe to re-run on every deploy.
+            if [ ! -L public/uploads ]; then
+              mkdir -p /var/www/pickleball/uploads
+              rm -rf public/uploads
+              ln -s /var/www/pickleball/uploads public/uploads
+            fi
+
             GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-            
-            # 2. Inject the dynamic short-lived authorization token directly into your remote URL
             git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-            
-            # 3. Pull code directly from your secure deploy branch
+
             git fetch origin deploy
             git checkout deploy
             git reset --hard origin/deploy
-            
-            # 4. Strip the security token out immediately to keep your git config file clean
+
+            # Strip token immediately after use
             git remote set-url origin "https://github.com/${{ github.repository }}.git"
-            
-            # 5. Handle node production updates
+
+            # Old TS source folders are gone after reset — no need to delete them first
+            # (previously this ran unconditionally before the pull, risking data loss)
+
             npm install --omit=dev
-            
-            # 6. Boot from the true entry point script using npm package start script flags
-            pm2 restart pickleball-api --update-env || pm2 start npm --name "pickleball-api" -- run start
+
+            # Rolling restart — keeps existing workers alive until new ones are ready
+            pm2 reload pickleball-api --update-env || pm2 start npm --name "pickleball-api" -- run start
+
+            # Health check — roll back if the app didn't come up within 30s
+            echo "Waiting for app to become healthy..."
+            for i in $(seq 1 6); do
+              sleep 5
+              if curl -sf http://localhost:1337/api/users-permissions/init > /dev/null 2>&1; then
+                echo "Health check passed."
+                exit 0
+              fi
+              echo "Attempt $i/6 failed, retrying..."
+            done
+
+            echo "ERROR: Health check failed after 30s. Rolling back..."
+            git reset --hard HEAD~1
+            npm install --omit=dev
+            pm2 reload pickleball-api --update-env
+            exit 1
