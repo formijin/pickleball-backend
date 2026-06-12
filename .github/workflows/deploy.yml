@@ -35,8 +35,13 @@ jobs:
           [ -d dist ] && cp -r dist ../deploy-package/ || echo "No dist folder"
           [ -d public ] && cp -r public ../deploy-package/ || echo "No public folder"
 
+          # Deploy compiled config to both locations Strapi checks
           cp -r dist/config ../deploy-package/config
 
+          # Ship tsconfig.json so Strapi can resolve distDir on the server
+          cp tsconfig.json ../deploy-package/
+
+          # Package the admin panel build from where strapi build wrote it
           ADMIN_BUILD="node_modules/@strapi/admin/dist/server/server/build"
           if [ -d "$ADMIN_BUILD" ]; then
             mkdir -p ../deploy-package/strapi-admin-build
@@ -46,6 +51,7 @@ jobs:
             echo "WARNING: Admin build not found at $ADMIN_BUILD"
           fi
 
+          # Protect live upload storage
           rm -rf ../deploy-package/public/uploads
 
           cp package.json ../deploy-package/
@@ -58,10 +64,10 @@ jobs:
           git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git checkout -b deploy
 
-          # Force-add build artifacts that are excluded by .gitignore
+          # Force-add build artifacts excluded by .gitignore
           git add --force dist/ strapi-admin-build/ 2>/dev/null || true
-          # Normal add for everything else (respects .gitignore to stay safe)
-          git add config/ public/ package.json package-lock.json 2>/dev/null || true
+          # Normal add for everything else
+          git add config/ public/ package.json package-lock.json tsconfig.json 2>/dev/null || true
           git add $(git ls-files --others --exclude-standard | grep -v '\.env') 2>/dev/null || true
 
           git commit -m "build: backend production artifacts (commit ${{ github.sha }})"
@@ -95,6 +101,7 @@ jobs:
             ROLLBACK_DIST=$(mktemp -d)
             cp -r dist "$ROLLBACK_DIST/" 2>/dev/null || true
             cp -r config "$ROLLBACK_DIST/" 2>/dev/null || true
+            cp tsconfig.json "$ROLLBACK_DIST/" 2>/dev/null || true
 
             GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
             git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
@@ -106,7 +113,6 @@ jobs:
             # Strip token immediately after use
             git remote set-url origin "https://github.com/${{ github.repository }}.git"
 
-            # Only reinstall if dependencies changed — uses cache for speed
             npm install --omit=dev --prefer-offline
 
             # Restore admin panel build into node_modules where Strapi expects it.
@@ -137,6 +143,7 @@ jobs:
             echo "ERROR: Health check failed after 60s. Rolling back..."
             cp -r "$ROLLBACK_DIST/dist" . 2>/dev/null || true
             cp -r "$ROLLBACK_DIST/config" . 2>/dev/null || true
+            cp "$ROLLBACK_DIST/tsconfig.json" . 2>/dev/null || true
             rm -rf "$ROLLBACK_DIST"
             npm install --omit=dev --prefer-offline
             pm2 reload pickleball-api --update-env
