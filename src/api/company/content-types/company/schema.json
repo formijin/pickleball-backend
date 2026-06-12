@@ -16,10 +16,6 @@
       "required": true,
       "unique": true
     },
-    "description": {
-      "type": "string",
-      "required": true
-    },
     "logo": {
       "type": "media",
       "multiple": true,

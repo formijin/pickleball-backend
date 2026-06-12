@@ -8,7 +8,6 @@ export interface SomethingExcerpts extends Struct.ComponentSchema {
   };
   attributes: {
     body: Schema.Attribute.String;
-    title: Schema.Attribute.String;
   };
 }
 
