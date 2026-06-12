@@ -1,0 +1,17 @@
+{
+    "collectionName": "components_something_excerpts",
+    "info": {
+        "displayName": "Excerpts",
+        "icon": "book"
+    },
+    "options": {},
+    "attributes": {
+        "title": {
+            "type": "string"
+        },
+        "body": {
+            "type": "string"
+        }
+    },
+    "config": {}
+}
