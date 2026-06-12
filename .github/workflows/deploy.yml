@@ -32,15 +32,13 @@ jobs:
         run: |
           mkdir ../deploy-package
 
-          # dist/ includes both compiled app (dist/src/) and admin panel (dist/build/)
           [ -d dist ] && cp -r dist ../deploy-package/ || echo "No dist folder"
           [ -d public ] && cp -r public ../deploy-package/ || echo "No public folder"
 
-          # Deploy compiled config to both locations Strapi checks:
-          # Strapi reads appDir/config first — must exist alongside dist/config
+          # Deploy compiled config to both locations Strapi checks
           cp -r dist/config ../deploy-package/config
 
-          # Protect live upload storage — never package uploads
+          # Protect live upload storage
           rm -rf ../deploy-package/public/uploads
 
           cp package.json ../deploy-package/
@@ -99,6 +97,18 @@ jobs:
             git remote set-url origin "https://github.com/${{ github.repository }}.git"
 
             npm install --omit=dev
+
+            # Link admin panel build to where Strapi's server expects it.
+            # npm install may recreate node_modules so we re-link on every deploy.
+            ADMIN_BUILD_SRC="/var/www/pickleball/backend/dist/build"
+            ADMIN_BUILD_DEST="/var/www/pickleball/backend/node_modules/@strapi/admin/dist/server/server/build"
+            if [ -d "$ADMIN_BUILD_SRC" ]; then
+              rm -rf "$ADMIN_BUILD_DEST"
+              ln -s "$ADMIN_BUILD_SRC" "$ADMIN_BUILD_DEST"
+              echo "Admin panel build linked."
+            else
+              echo "WARNING: Admin build source missing at $ADMIN_BUILD_SRC"
+            fi
 
             pm2 reload pickleball-api --update-env || pm2 start /var/www/pickleball/ecosystem.config.js
 
