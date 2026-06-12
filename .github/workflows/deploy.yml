@@ -5,85 +5,10 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-and-package:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Strapi production assets
-        run: npm run build
-        env:
-          NODE_ENV: production
-
-      - name: Package Production Artifacts
-        run: |
-          mkdir ../deploy-package
-
-          [ -d dist ] && cp -r dist ../deploy-package/ || echo "No dist folder"
-          [ -d public ] && cp -r public ../deploy-package/ || echo "No public folder"
-
-          # Deploy compiled config to both locations Strapi checks
-          cp -r dist/config ../deploy-package/config
-
-          # Write a production-safe tsconfig.json that tells Strapi where distDir
-          # is without attempting to compile TypeScript (no src/ on the server)
-          cat > ../deploy-package/tsconfig.json << 'EOF'
-          {
-            "compilerOptions": {
-              "outDir": "dist"
-            },
-            "include": [],
-            "exclude": []
-          }
-          EOF
-
-          # Package the admin panel build from where strapi build wrote it
-          ADMIN_BUILD="node_modules/@strapi/admin/dist/server/server/build"
-          if [ -d "$ADMIN_BUILD" ]; then
-            mkdir -p ../deploy-package/strapi-admin-build
-            cp -r "$ADMIN_BUILD"/. ../deploy-package/strapi-admin-build/
-            echo "Admin panel build packaged."
-          else
-            echo "WARNING: Admin build not found at $ADMIN_BUILD"
-          fi
-
-          # Protect live upload storage
-          rm -rf ../deploy-package/public/uploads
-
-          cp package.json ../deploy-package/
-          cp package-lock.json ../deploy-package/
-
-          cd ../deploy-package
-          git init
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git checkout -b deploy
-
-          # Force-add build artifacts excluded by .gitignore
-          git add --force dist/ strapi-admin-build/ 2>/dev/null || true
-          # Normal add for everything else
-          git add config/ public/ package.json package-lock.json tsconfig.json 2>/dev/null || true
-          git add $(git ls-files --others --exclude-standard | grep -v '\.env') 2>/dev/null || true
-
-          git commit -m "build: backend production artifacts (commit ${{ github.sha }})"
-          git push -f origin deploy
-
-  remote-deploy:
-    needs: build-and-package
+  deploy:
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -106,36 +31,30 @@ jobs:
               ln -s /var/www/pickleball/uploads public/uploads
             fi
 
-            # Snapshot current state before touching anything — used for rollback
-            ROLLBACK_DIST=$(mktemp -d)
-            cp -r dist "$ROLLBACK_DIST/" 2>/dev/null || true
-            cp -r config "$ROLLBACK_DIST/" 2>/dev/null || true
-            cp tsconfig.json "$ROLLBACK_DIST/" 2>/dev/null || true
+            # Snapshot current dist and config for rollback
+            ROLLBACK=$(mktemp -d)
+            cp -r dist "$ROLLBACK/" 2>/dev/null || true
+            cp -r config "$ROLLBACK/" 2>/dev/null || true
 
-            GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-            git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+            # Pull latest source from main
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
 
-            git fetch origin deploy
-            git checkout deploy
-            git reset --hard origin/deploy
-
-            # Strip token immediately after use
-            git remote set-url origin "https://github.com/${{ github.repository }}.git"
-
+            # Install dependencies
             npm install --omit=dev --prefer-offline
 
-            # Restore admin panel build into node_modules where Strapi expects it.
-            # Must happen after npm install since install would otherwise wipe it.
-            ADMIN_BUILD_DEST="node_modules/@strapi/admin/dist/server/server/build"
-            if [ -d strapi-admin-build ]; then
-              rm -rf "$ADMIN_BUILD_DEST"
-              mkdir -p "$ADMIN_BUILD_DEST"
-              cp -r strapi-admin-build/. "$ADMIN_BUILD_DEST/"
-              echo "Admin panel build restored."
-            else
-              echo "WARNING: strapi-admin-build not found — admin panel may not load."
-            fi
+            # Ensure compiled config is in both locations Strapi checks
+            mkdir -p config
+            cp -r dist/config/. config/
 
+            # Stop Strapi to free RAM before building admin panel
+            pm2 stop pickleball-api || true
+
+            # Build admin panel on server
+            NODE_ENV=production NODE_OPTIONS="--max-old-space-size=1024" node_modules/.bin/strapi build
+
+            # Start Strapi back up
             pm2 reload pickleball-api --update-env || pm2 start /var/www/pickleball/ecosystem.config.js
 
             echo "Waiting for app to become healthy..."
@@ -143,17 +62,16 @@ jobs:
               sleep 5
               if curl -sf http://localhost:1337/_health > /dev/null 2>&1; then
                 echo "Health check passed on attempt $i."
-                rm -rf "$ROLLBACK_DIST"
+                rm -rf "$ROLLBACK"
                 exit 0
               fi
               echo "Attempt $i/12: server not responding yet..."
             done
 
             echo "ERROR: Health check failed after 60s. Rolling back..."
-            cp -r "$ROLLBACK_DIST/dist" . 2>/dev/null || true
-            cp -r "$ROLLBACK_DIST/config" . 2>/dev/null || true
-            cp "$ROLLBACK_DIST/tsconfig.json" . 2>/dev/null || true
-            rm -rf "$ROLLBACK_DIST"
+            cp -r "$ROLLBACK/dist" . 2>/dev/null || true
+            cp -r "$ROLLBACK/config" . 2>/dev/null || true
+            rm -rf "$ROLLBACK"
             npm install --omit=dev --prefer-offline
             pm2 reload pickleball-api --update-env
             exit 1
