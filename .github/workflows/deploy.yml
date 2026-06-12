@@ -36,9 +36,17 @@ jobs:
           [ -d dist ] && cp -r dist ../deploy-package/ || echo "No dist folder"
           [ -d public ] && cp -r public ../deploy-package/ || echo "No public folder"
 
-          # Deploy compiled config to BOTH locations Strapi checks:
-          # dist/config/ (distDir) and config/ (appDir) — Strapi reads appDir first
+          # Deploy compiled config to both locations Strapi checks:
+          # Strapi reads appDir/config first — must exist alongside dist/config
           cp -r dist/config ../deploy-package/config
+
+          # Ship pre-built admin panel assets from CI runner (avoids OOM on server)
+          if [ -d node_modules/@strapi/admin/dist/build ]; then
+            cp -r node_modules/@strapi/admin/dist/build ../deploy-package/strapi-admin-build
+            echo "Admin panel assets packaged."
+          else
+            echo "WARNING: No admin build found at node_modules/@strapi/admin/dist/build"
+          fi
 
           # Protect live upload storage — never package uploads
           rm -rf ../deploy-package/public/uploads
@@ -53,7 +61,7 @@ jobs:
           git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git checkout -b deploy
 
-          git add build/ dist/ config/ public/ package.json package-lock.json 2>/dev/null || true
+          git add build/ dist/ config/ public/ strapi-admin-build/ package.json package-lock.json 2>/dev/null || true
           git add $(git ls-files --others --exclude-standard | grep -v '\.env') 2>/dev/null || true
 
           git commit -m "build: backend production artifacts (commit ${{ github.sha }})"
@@ -90,14 +98,21 @@ jobs:
             git checkout deploy
             git reset --hard origin/deploy
 
+            # Strip token immediately after use
             git remote set-url origin "https://github.com/${{ github.repository }}.git"
 
             npm install --omit=dev
 
-            # Rebuild admin panel assets from the freshly installed node_modules
-            NODE_ENV=production node_modules/.bin/strapi build
+            # Restore pre-built admin panel assets (built on CI runner, not server)
+            if [ -d strapi-admin-build ]; then
+              rm -rf node_modules/@strapi/admin/dist/build
+              mv strapi-admin-build node_modules/@strapi/admin/dist/build
+              echo "Admin panel assets restored."
+            else
+              echo "WARNING: No pre-built admin assets in deploy package — admin panel may not load."
+            fi
 
-            pm2 reload pickleball-api --update-env || pm2 start ecosystem.config.js
+            pm2 reload pickleball-api --update-env || pm2 start /var/www/pickleball/ecosystem.config.js
 
             echo "Waiting for app to become healthy..."
             for i in $(seq 1 6); do
@@ -112,6 +127,5 @@ jobs:
             echo "ERROR: Health check failed after 30s. Rolling back..."
             git reset --hard HEAD~1
             npm install --omit=dev
-            NODE_ENV=production node_modules/.bin/strapi build
             pm2 reload pickleball-api --update-env
             exit 1
