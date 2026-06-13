@@ -46,6 +46,7 @@ For content editors managing global SEO and social metadata in Strapi, use:
 
 - `docs/site-settings-editor-guide.md`
 
+
 ## 📚 Learn more
 
 - [Resource center](https://strapi.io/resource-center) - Strapi resource center.
