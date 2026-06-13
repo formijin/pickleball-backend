@@ -18,8 +18,8 @@
     },
     "logo": {
       "type": "media",
-      "multiple": true,
-      "required": true,
+      "multiple": false,
+      "required": false,
       "allowedTypes": [
         "images",
         "files",

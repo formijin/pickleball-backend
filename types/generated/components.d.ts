@@ -3,11 +3,15 @@ import type { Schema, Struct } from '@strapi/strapi';
 export interface SomethingExcerpts extends Struct.ComponentSchema {
   collectionName: 'components_something_excerpts';
   info: {
-    displayName: 'Excerpts';
+    displayName: 'SEO Content';
     icon: 'book';
   };
   attributes: {
-    body: Schema.Attribute.String;
+    Excerpt: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    publish_date: Schema.Attribute.Date;
   };
 }
 

@@ -1,13 +1,17 @@
 {
   "collectionName": "components_something_excerpts",
   "info": {
-    "displayName": "Excerpts",
+    "displayName": "SEO Content",
     "icon": "book"
   },
   "options": {},
   "attributes": {
-    "body": {
-      "type": "string"
+    "Excerpt": {
+      "type": "text",
+      "maxLength": 200
+    },
+    "publish_date": {
+      "type": "date"
     }
   },
   "config": {}

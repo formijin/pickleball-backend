@@ -33,26 +33,23 @@
       "target": "plugin::users-permissions.user",
       "inversedBy": "press_releases"
     },
-    "excerpts": {
+    "SEO_Content": {
       "type": "component",
       "component": "something.excerpts",
       "repeatable": false,
-      "required": true
+      "required": false
     },
-    "cover": {
+    "thumbnail": {
       "type": "media",
       "multiple": false,
-      "required": true,
+      "required": false,
       "allowedTypes": [
-        "images",
-        "files",
-        "videos",
-        "audios"
+        "images"
       ]
     },
     "body": {
       "type": "richtext",
-      "required": true
+      "required": false
     }
   }
 }

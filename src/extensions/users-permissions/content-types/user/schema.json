@@ -74,10 +74,7 @@
       "type": "string",
       "required": true
     },
-    "nickname": {
-      "type": "string"
-    },
-    "picture": {
+    "thumbnail": {
       "type": "media",
       "multiple": false,
       "allowedTypes": [

@@ -20,6 +20,10 @@
       "relation": "manyToMany",
       "target": "api::press-release.press-release",
       "inversedBy": "category"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
     }
   }
 }

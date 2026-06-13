@@ -465,6 +465,7 @@ export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
       'api::press-release.press-release'
     >;
     publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'title'>;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -492,11 +493,7 @@ export interface ApiCompanyCompany extends Struct.CollectionTypeSchema {
       'api::company.company'
     > &
       Schema.Attribute.Private;
-    logo: Schema.Attribute.Media<
-      'images' | 'files' | 'videos' | 'audios',
-      true
-    > &
-      Schema.Attribute.Required;
+    logo: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     name: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
@@ -527,15 +524,11 @@ export interface ApiPressReleasePressRelease
       'manyToMany',
       'plugin::users-permissions.user'
     >;
-    body: Schema.Attribute.RichText & Schema.Attribute.Required;
+    body: Schema.Attribute.RichText;
     category: Schema.Attribute.Relation<'manyToMany', 'api::category.category'>;
-    cover: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'> &
-      Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    excerpts: Schema.Attribute.Component<'something.excerpts', false> &
-      Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -543,7 +536,9 @@ export interface ApiPressReleasePressRelease
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
+    SEO_Content: Schema.Attribute.Component<'something.excerpts', false>;
     slug: Schema.Attribute.UID<'title'> & Schema.Attribute.Required;
+    thumbnail: Schema.Attribute.Media<'images'>;
     title: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
@@ -1061,13 +1056,11 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.user'
     > &
       Schema.Attribute.Private;
-    nickname: Schema.Attribute.String;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
-    picture: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     press_releases: Schema.Attribute.Relation<
       'manyToMany',
       'api::press-release.press-release'
@@ -1079,6 +1072,7 @@ export interface PluginUsersPermissionsUser
       'manyToOne',
       'plugin::users-permissions.role'
     >;
+    thumbnail: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
