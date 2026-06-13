@@ -559,19 +559,41 @@ export interface ApiSiteSettingSiteSetting extends Struct.SingleTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
+    canonicalHomepageUrl: Schema.Attribute.String;
+    contactEmail: Schema.Attribute.Email;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    defaultLocale: Schema.Attribute.String & Schema.Attribute.DefaultTo<'en'>;
+    defaultOgDescription: Schema.Attribute.Text;
+    defaultOgImage: Schema.Attribute.Media<'images'>;
+    defaultOgImageAlt: Schema.Attribute.String;
+    defaultOgTitle: Schema.Attribute.String;
+    defaultTwitterImage: Schema.Attribute.Media<'images'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'api::site-setting.site-setting'
     > &
       Schema.Attribute.Private;
+    ogSiteName: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     registrationUrl: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'#'>;
+    siteDescription: Schema.Attribute.Text &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'The first global collegiate pickleball tournament. National university champions from every continent competing on one world stage.'>;
+    siteName: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'College Pickleball Cup'>;
+    siteUrl: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'https://pickleballcup.com'>;
+    twitterCard: Schema.Attribute.Enumeration<
+      ['summary', 'summary_large_image']
+    > &
+      Schema.Attribute.DefaultTo<'summary_large_image'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

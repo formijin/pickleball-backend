@@ -40,6 +40,12 @@ Strapi gives you many possible deployment options for your project including [St
 yarn strapi deploy
 ```
 
+## Site Settings Guide
+
+For content editors managing global SEO and social metadata in Strapi, use:
+
+- `docs/site-settings-editor-guide.md`
+
 ## 📚 Learn more
 
 - [Resource center](https://strapi.io/resource-center) - Strapi resource center.

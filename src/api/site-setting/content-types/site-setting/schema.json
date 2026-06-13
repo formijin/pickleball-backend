@@ -11,10 +11,79 @@
   },
   "pluginOptions": {},
   "attributes": {
+    "siteName": {
+      "type": "string",
+      "default": "College Pickleball Cup",
+      "required": true
+    },
+    "siteDescription": {
+      "type": "text",
+      "default": "The first global collegiate pickleball tournament. National university champions from every continent competing on one world stage.",
+      "required": true
+    },
+    "siteUrl": {
+      "type": "string",
+      "default": "https://pickleballcup.com",
+      "required": true
+    },
+    "defaultLocale": {
+      "type": "string",
+      "default": "en",
+      "required": false
+    },
+    "defaultOgTitle": {
+      "type": "string",
+      "required": false
+    },
+    "defaultOgDescription": {
+      "type": "text",
+      "required": false
+    },
+    "ogSiteName": {
+      "type": "string",
+      "required": false
+    },
+    "defaultOgImage": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "defaultOgImageAlt": {
+      "type": "string",
+      "required": false
+    },
+    "twitterCard": {
+      "type": "enumeration",
+      "required": false,
+      "default": "summary_large_image",
+      "enum": [
+        "summary",
+        "summary_large_image"
+      ]
+    },
+    "defaultTwitterImage": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "canonicalHomepageUrl": {
+      "type": "string",
+      "required": false
+    },
+    "contactEmail": {
+      "type": "email",
+      "required": false
+    },
     "registrationUrl": {
       "type": "string",
-      "required": true,
-      "default": "#"
+      "default": "#",
+      "required": true
     }
   }
 }
